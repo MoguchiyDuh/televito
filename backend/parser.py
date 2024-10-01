@@ -3,8 +3,9 @@ from dotenv import load_dotenv
 import pyrogram
 import os
 from pyrogram.types import Message
+from datetime import datetime, timedelta
 
-load_dotenv()
+load_dotenv(dotenv_path="./backend/.env")
 
 client = pyrogram.Client(
     name="televito",
@@ -21,25 +22,32 @@ conn = psycopg2.connect(
 cur = conn.cursor()
 
 
-async def parse():
+async def parse(date_start, date_end):
     await client.start()
 
-    content = []
+    imgs = []
     try:
-        async for message in client.get_chat_history(os.environ.get("GROUP_ID")):
+        async for message in client.get_chat_history(
+            os.environ.get("GROUP_ID"),
+            offset_date=date_start,
+        ):
             message: Message
+            if message.date < date_end:
+                cur.close()
+                conn.close()
+                break
             if "Локация" in str(message.caption):
                 cur.execute(
                     """
     INSERT INTO parse_db (text, imgs, date)
     VALUES (%s, %s, %s);""",
-                    (str(message.caption), content, message.date),
+                    (str(message.caption), imgs, message.date),
                 )
                 conn.commit()
-                content = []
+                imgs = []
                 print(message.date)
             else:
-                content.append(str(message.photo.file_id))
+                imgs.append(str(message.photo.file_id))
     except AttributeError:
         cur.close()
         conn.close()
@@ -47,5 +55,7 @@ async def parse():
     await client.stop()
 
 
-def start_parse():
-    client.run(parse())
+def start_parser(
+    date_start=datetime.now(), date_end=datetime.now() - timedelta(weeks=1)
+):
+    client.run(parse(date_start, date_end))
