@@ -3,6 +3,7 @@ from sqlalchemy import (
     ARRAY,
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     Float,
     Integer,
@@ -20,7 +21,7 @@ class ParseModel(Base):
     )
     google_maps_url: Mapped[str] = mapped_column(String, nullable=True)
     location: Mapped[str] = mapped_column(String(150), nullable=False)
-    status: Mapped[datetime] = mapped_column(DateTime, nullable=True)
+    status: Mapped[datetime] = mapped_column(Date, nullable=True)
     price: Mapped[float] = mapped_column(Float, nullable=False)  # Euro
     duration: Mapped[int] = mapped_column(Integer, nullable=True)  # months
     is_new: Mapped[bool] = mapped_column(Boolean, nullable=True)
