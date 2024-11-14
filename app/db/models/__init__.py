@@ -1,2 +1,2 @@
-from .parse_model import ParseModel
+from .tg_post_model import TGPostModel
 from .user_model import UserModel

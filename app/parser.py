@@ -2,16 +2,16 @@ import asyncio
 from datetime import date, datetime, timedelta
 from pyrogram import Client
 from pyrogram.types.messages_and_media.message import Message
-from sqlalchemy import func, select
+from sqlalchemy import func, select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from colorama import Fore
 
-from .db.models import ParseModel
+from .db.models import TGPostModel
 from .core.config import TG_API_HASH, TG_API_ID, TG_GROUP_NAME
 from .parser_re import parse_text
 
 app = Client("televito", api_hash=TG_API_HASH, api_id=TG_API_ID)
-DAYS_TO_PARSE_IF_EMPTY = 90  # 3 months
+DAYS_TO_PARSE = 6 * 90  # 6 months
 
 
 class Parser:
@@ -24,23 +24,23 @@ class Parser:
         google_maps_url: str,
         images: list[str],
         post_datetime: datetime,
-    ) -> ParseModel:
+    ) -> TGPostModel:
         """Converts parsed text and metadata into a ParseModel object."""
-        return ParseModel(
+        return TGPostModel(
             google_maps_url=google_maps_url,
             **parsed_text,
             images=images,
             publication_datetime=post_datetime,
         )
 
-    async def insert_data(self, model: ParseModel):
+    async def insert_data(self, item: TGPostModel):
         """Inserts or updates a post in the database if needed."""
         result = await self.db.execute(
-            select(ParseModel).filter(
-                ParseModel.location == model.location,
-                ParseModel.area == model.area,
-                ParseModel.floor == model.floor,
-                ParseModel.floors_in_building == model.floors_in_building,
+            select(TGPostModel).filter(
+                TGPostModel.location == item.location,
+                TGPostModel.area == item.area,
+                TGPostModel.floor == item.floor,
+                TGPostModel.floors_in_building == item.floors_in_building,
             )
         )
 
@@ -48,20 +48,20 @@ class Parser:
 
         # if there is no similar post in the DB, add it to the DB
         if not similar_post:
-            self.db.add(model)
+            self.db.add(item)
             print(
-                f"{Fore.GREEN}✓ New post added to the DB.{Fore.RESET}\n"
-                f"{Fore.CYAN}Location:{Fore.RESET} {model.location}, {Fore.CYAN}Area:{Fore.RESET} {model.area}, {Fore.CYAN}Published on:{Fore.RESET} {model.publication_datetime}"
+                f"{Fore.GREEN}✓ NEW POST ADDED TO THE DB.{Fore.RESET}\n"
+                f"{Fore.CYAN}Location:{Fore.RESET} {item.location}, {Fore.CYAN}Area:{Fore.RESET} {item.area}, {Fore.CYAN}Published on:{Fore.RESET} {item.publication_datetime}"
             )
             await self.db.commit()
+
         # if the post in the DB is outdated, update it
-        elif model.publication_datetime > similar_post.publication_datetime:
-            print(f"{Fore.BLUE}Updating existing post in the DB.{Fore.RESET}")
-            for key, value in model.__dict__.items():
+        elif item.publication_datetime > similar_post.publication_datetime:
+            print(f"{Fore.BLUE}🔄 UPDATING EXISTING POST IN THE DB.{Fore.RESET}")
+            for key, value in item.__dict__.items():
                 if key != "_sa_instance_state" and value != getattr(similar_post, key):
                     print(
-                        f"{Fore.CYAN}{key.upper()}: {Fore.YELLOW}Updated from {getattr(similar_post, key)} "
-                        f"to {value}{Fore.RESET}"
+                        f"{Fore.CYAN}{key.upper()}: {Fore.YELLOW}Updated from{Fore.RESET} {getattr(similar_post, key)} {Fore.YELLOW}to{Fore.RESET} {value}"
                     )
                     setattr(similar_post, key, value)
             await self.db.commit()
@@ -69,18 +69,39 @@ class Parser:
         # if the post in the DB is newer than the parsing post, skip it
         else:
             print(
-                f"{Fore.YELLOW}⚠️  Skipped outdated post.{Fore.RESET}\n"
-                f"{Fore.CYAN}Location:{Fore.RESET} {model.location}, {Fore.CYAN}Area:{Fore.RESET} {model.area}, {Fore.CYAN}Published on:{Fore.RESET} {model.publication_datetime}"
+                f"{Fore.YELLOW}⚠️ SKIPPED OUTDATED POST.{Fore.RESET}\n"
+                f"{Fore.CYAN}Location:{Fore.RESET} {item.location}, {Fore.CYAN}Area:{Fore.RESET} {item.area}, {Fore.CYAN}Published on:{Fore.RESET} {item.publication_datetime}"
             )
+
+    async def delete_item(self, item: TGPostModel):
+        """Deletes an item from the database."""
+        print(
+            f"{Fore.RED}🗑️ OUTDATED POST DELETED FROM THE DB{Fore.RESET}\n",
+            f"{Fore.CYAN}Location:{Fore.RESET} {item.location}, {Fore.CYAN}Area:{Fore.RESET} {item.area}, {Fore.CYAN}Published on:{Fore.RESET} {item.publication_datetime}",
+        )
+        query = delete(TGPostModel).where(TGPostModel == item)
+        await self.db.execute(query)
+        await self.db.commit()
 
     async def update_db(self):
         """Fetches and updates database with posts from the Telegram chat."""
-        latest_date_query = await self.db.execute(
-            select(func.max(ParseModel.publication_datetime))
+        latest_item_date = await self.db.execute(
+            select(func.max(TGPostModel.publication_datetime))
         )
-        latest_date = latest_date_query.scalar() or (
-            datetime.now() - timedelta(days=DAYS_TO_PARSE_IF_EMPTY)
+        latest_date = latest_item_date.scalar() or (
+            datetime.now() - timedelta(days=DAYS_TO_PARSE)
         )
+        cutoffdata = datetime.now() - timedelta(days=DAYS_TO_PARSE)
+
+        outdated_items_query = select(TGPostModel).filter(
+            TGPostModel.publication_datetime < cutoffdata
+        )
+        outdated_items = await self.db.execute(outdated_items_query)
+        items_to_delete = outdated_items.scalars().all()
+
+        for item in items_to_delete:
+            await self.delete_item(item)
+
         image_list = []
 
         async with app:
@@ -88,7 +109,7 @@ class Parser:
                 post: Message
                 if post.date <= latest_date:
                     print(
-                        f"{Fore.GREEN}🔄💾 The database is up-to-date as of {latest_date}{Fore.RESET}"
+                        f"{Fore.GREEN}🔄💾 THE DATABASE IS UP-TO-DATE AS OF{Fore.RESET} {datetime.now()}"
                     )
                     break
 

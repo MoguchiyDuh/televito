@@ -1,14 +1,11 @@
-# main.py
-
 from colorama import Fore
 from fastapi import FastAPI
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from contextlib import asynccontextmanager
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from .parser import Parser
 from .db.connection import get_db
-from .routes import user_route
+from .routes import user_route, tg_post_route
 
 # Initialize the scheduler for periodic tasks
 scheduler = AsyncIOScheduler()
@@ -43,6 +40,7 @@ app = FastAPI(lifespan=lifespan)
 
 # Include user management routes
 app.include_router(user_route, prefix="/users")
+app.include_router(tg_post_route, prefix="/tg_posts")
 
 
 @app.get("/")

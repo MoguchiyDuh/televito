@@ -183,7 +183,7 @@ OUTPUT5:
 """
 
 
-def check_response(result: dict):
+def check_response_types(result: dict):
     """Ensures response fields match expected types."""
     expected_types = {
         "location": str,
@@ -245,7 +245,7 @@ def parse_with_ai(
         },
         {
             "role": "user",
-            "content": f"ДАТА ПОСТА: {post_datetime.strftime("%d.%m.%Y")}\n" + prompt,
+            "content": f"ДАТА ПОСТА: {post_datetime.strftime("Y%-%m-%d")}\n" + prompt,
         },
     ]
     errors_count, max_errors = 0, 3
@@ -270,7 +270,7 @@ def parse_with_ai(
                 )
 
             # Verify types and return the parsed result
-            check_response(result)
+            check_response_types(result)
             return result
 
         except (json.JSONDecodeError, TypeError, ValueError) as e:

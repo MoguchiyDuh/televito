@@ -13,8 +13,8 @@ from sqlalchemy.orm import Mapped, mapped_column
 from .. import Base
 
 
-class ParseModel(Base):
-    __tablename__ = "parser"
+class TGPostModel(Base):
+    __tablename__ = "tg_posts"
 
     id: Mapped[int] = mapped_column(
         BigInteger, primary_key=True, index=True, autoincrement=True
@@ -23,10 +23,14 @@ class ParseModel(Base):
     location: Mapped[str] = mapped_column(String(150), nullable=False)
     status: Mapped[datetime] = mapped_column(Date, nullable=True)
     price: Mapped[float] = mapped_column(Float, nullable=False)  # Euro
-    duration: Mapped[int] = mapped_column(Integer, nullable=True)  # months
+    duration: Mapped[int] = mapped_column(
+        Integer, nullable=True
+    )  # minimal lease duration in months
     is_new: Mapped[bool] = mapped_column(Boolean, nullable=True)
     rooms: Mapped[float] = mapped_column(Float, nullable=True)
-    room_description: Mapped[str] = mapped_column(String(100), nullable=True)
+    room_description: Mapped[str] = mapped_column(
+        String(100), nullable=True
+    )  # total floors in a building
     area: Mapped[float] = mapped_column(Float, nullable=True)
     floor: Mapped[int] = mapped_column(Integer, nullable=True)
     floors_in_building: Mapped[int] = mapped_column(Integer, nullable=True)
