@@ -11,7 +11,7 @@ from .core.utils import store_log
 # Configuration for API URL and model instruction
 API_URL = "http://localhost:11434/api/chat"
 MODEL_INSTRUCTION = """
-You must parse the data in JSON FORMAT about apartment rentals according to the format below. Follow these rules STRICTLY!:
+You must return the data in JSON FORMAT about apartment rentals according to the format below. Follow these rules STRICTLY!:
 - DO NOT ADD NEW FIELDS, YOU ARE ALLOWED TO USE ONLY PROVIDED.
 - DO NOT change data types other than those provided.
 - The output must be VALID JSON FORMAT!
@@ -245,7 +245,7 @@ def parse_with_ai(
         },
         {
             "role": "user",
-            "content": f"ДАТА ПОСТА: {post_datetime.strftime("Y%-%m-%d")}\n" + prompt,
+            "content": f"ДАТА ПОСТА: {post_datetime.strftime('Y%-%m-%d')}\n" + prompt,
         },
     ]
     errors_count, max_errors = 0, 3
@@ -263,7 +263,7 @@ def parse_with_ai(
 
             # Set the correct date format in 'status' field
             if isinstance(result.get("status"), str):
-                result["status"] = datetime.strptime(result["status"], "%d.%m.%Y")
+                result["status"] = datetime.fromisoformat(result["status"])
             else:
                 raise TypeError(
                     f"mismatching types! 'status' must be str in format 'YYYY-MM-DD.' to be parsed"
@@ -285,5 +285,5 @@ def parse_with_ai(
                 }
             )
 
-    print(f"{Fore.RED}❌ Exceeded maximum retries. Parsing failed.{Fore.RESET}")
-    return None  # Return None if parsing fails repeatedly
+    print(f"{Fore.RED}❌ Can't parse the post with AI model.{Fore.RESET}")
+    return None  # Return None if parsing fails

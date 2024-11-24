@@ -5,7 +5,7 @@ from contextlib import asynccontextmanager
 
 from .parser import Parser
 from .db.connection import get_db
-from .routes import user_route, tg_post_route
+from .routes import *
 
 # Initialize the scheduler for periodic tasks
 scheduler = AsyncIOScheduler()
@@ -41,6 +41,8 @@ app = FastAPI(lifespan=lifespan)
 # Include user management routes
 app.include_router(user_route, prefix="/users")
 app.include_router(tg_post_route, prefix="/tg_posts")
+app.include_router(post_route, prefix="/posts")
+app.include_router(category_route, prefix="/categories")
 
 
 @app.get("/")

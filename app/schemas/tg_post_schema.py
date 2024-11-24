@@ -9,7 +9,7 @@ class ShortTGPostSchema(BaseModel):
     price: float
     status: date
     publication_datetime: datetime
-    first_image: Optional[str]
+    first_image: Optional[str] = None
 
     @classmethod
     def from_orm_model(cls, orm_model):

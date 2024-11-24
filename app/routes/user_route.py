@@ -3,9 +3,9 @@ from typing import Optional
 from fastapi import (
     APIRouter,
     Depends,
+    File,
     Request,
     Response,
-    UploadFile,
 )
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -16,7 +16,7 @@ from ..schemas.user_schema import (
     UserChangePassword,
     UserCreate,
     UserDelete,
-    UserInfo,
+    UserProfileResponse,
     UserUpdate,
 )
 from ..services.user_service import (
@@ -32,11 +32,16 @@ from ..services.user_service import (
 router = APIRouter()
 
 
-@router.post("/register", response_model=UserInfo)
+@router.post("/register")
 async def register(
     user_schema: UserCreate = Depends(), db: AsyncSession = Depends(get_db)
 ):
-    return await create_user_logic(user_schema=user_schema, db=db)
+    user = await create_user_logic(user_schema=user_schema, db=db)
+
+    return {
+        "message": "User created successfully",
+        "user": UserProfileResponse.model_validate(user, from_attributes=True),
+    }
 
 
 @router.post("/token")
@@ -56,11 +61,19 @@ async def login(
         max_age=30 * 60,
         secure=True,
     )
+
     return {"access_token": access_token, "token_type": "bearer"}
 
 
-@router.get("/profile", response_model=UserInfo)
-async def read_profile(
+@router.get("/profile/{user_id}", response_model=UserProfileResponse)
+async def show_profile(user_id: int, db: AsyncSession = Depends(get_db)):
+    user = await get_user(user_id=user_id, db=db)
+
+    return UserProfileResponse.model_validate(user, from_attributes=True)
+
+
+@router.get("/profile")
+async def my_profile(
     request: Request,
     token=Depends(oauth2_scheme),
     db: AsyncSession = Depends(get_db),
@@ -72,30 +85,27 @@ async def read_profile(
 
     user = await get_user(username=username, db=db)
 
-    return UserInfo.model_validate(user, from_attributes=True)
+    return UserProfileResponse.model_validate(user, from_attributes=True)
 
 
-@router.put("/profile", response_model=UserInfo)
+@router.put("/profile", response_model=UserProfileResponse)
 async def update_profile(
     request: Request,
     user_update: UserUpdate = Depends(),
     token: str = Depends(oauth2_scheme),
-    profile_photo: Optional[UploadFile | str] = None,
     db: AsyncSession = Depends(get_db),
 ):
-    print(user_update, profile_photo, not profile_photo)
     if not token:
         token = request.cookies.get("access_token")
 
     username = verify_access_token(token=token)
 
-    user = await update_user_logic(
-        username=username, update_data=user_update, db=db, profile_photo=profile_photo
-    )
-    return UserInfo.model_validate(user, from_attributes=True)
+    user = await update_user_logic(username=username, update_data=user_update, db=db)
+
+    return UserProfileResponse.model_validate(user, from_attributes=True)
 
 
-@router.put("/change-password", response_model=UserInfo)
+@router.put("/change-password", response_model=UserProfileResponse)
 async def change_user_password(
     request: Request,
     password_schema: UserChangePassword = Depends(),
@@ -110,11 +120,12 @@ async def change_user_password(
     user = await change_user_password_logic(
         username=username, password_schema=password_schema, db=db
     )
-    return UserInfo.model_validate(user, from_attributes=True)
+
+    return UserProfileResponse.model_validate(user, from_attributes=True)
 
 
 @router.delete("/profile")
-async def delete_profile(
+async def delete_my_profile(
     request: Request,
     password_schema: UserDelete = Depends(),
     token: str = Depends(oauth2_scheme),
@@ -128,4 +139,5 @@ async def delete_profile(
         username=username, password=password_schema.password, db=db
     )
     request.cookies.clear()
+
     return deletion_response

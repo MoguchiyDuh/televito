@@ -11,8 +11,8 @@ from ..services.tg_post_service import get_filtered_tg_posts
 router = APIRouter()
 
 
-@router.get("", name="posts_list")
-async def posts_list(
+@router.get("/", name="tg_posts_list")
+async def tg_posts_list(
     request: Request,
     status: str | None = Query(None, pattern=r"\d{4}-\d{1,2}-\d{1,2}|today"),
     price: str | None = Query(None, pattern=r"\d+|\d+-\d+"),
@@ -58,20 +58,20 @@ async def posts_list(
     if page_num > 1:
         response["pagination"][
             "prev"
-        ] = f"{request.url_for("posts_list")}?page_num={page_num-1}&limit={limit}"
+        ] = f"{request.url_for('tg_posts_list')}?page_num={page_num-1}&limit={limit}"
 
     # Check for the next page link
     if total >= limit * page_num:
         response["pagination"][
             "next"
-        ] = f"{request.url_for("posts_list")}?page_num={page_num+1}&limit={limit}"
+        ] = f"{request.url_for('tg_posts_list')}?page_num={page_num+1}&limit={limit}"
 
     return response
 
 
 # Get post details by ID
 @router.get("/{post_id}", response_model=TGPostSchema)
-async def get_post(post_id: int, db: AsyncSession = Depends(get_db)):
+async def get_tg_post(post_id: int, db: AsyncSession = Depends(get_db)):
     post = await db.execute(select(TGPostModel).filter(TGPostModel.id == post_id))
     post = post.scalar_one_or_none()
     if not post:

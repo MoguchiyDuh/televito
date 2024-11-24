@@ -1,11 +1,14 @@
 from datetime import datetime
+from fastapi import File, UploadFile
 from pydantic import BaseModel, EmailStr, Field
 from typing import Optional
 
 
-class UserInfo(BaseModel):
+class UserProfileResponse(BaseModel):
+    id: int
     username: str
     email: EmailStr
+    phone: Optional[str] = None
     profile_photo: Optional[str] = None
     description: Optional[str] = None
     rating: Optional[float] = None
@@ -14,14 +17,17 @@ class UserInfo(BaseModel):
 
 class UserCreate(BaseModel):
     username: str = Field(..., min_length=4, max_length=32)
-    email: EmailStr
+    email: EmailStr = Field(...)
+    phone: Optional[str] = Field(None, min_length=10, max_length=15)
     password: str = Field(..., min_length=6)
 
 
 class UserUpdate(BaseModel):
-    username: Optional[str] = None
-    email: Optional[EmailStr] = None
-    description: Optional[str] = None
+    username: Optional[str] = Field(None, min_length=4, max_length=32)
+    email: Optional[EmailStr] = Field(None)
+    phone: Optional[str] = Field(None, min_length=10, max_length=15)
+    description: Optional[str] = Field(None)
+    profile_photo: Optional[UploadFile] = File(default=[])
 
 
 class UserChangePassword(BaseModel):

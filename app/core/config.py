@@ -3,7 +3,7 @@ import os
 
 load_dotenv()
 
-DB_URL = f"postgresql+asyncpg://{os.environ.get('DB_USERNAME')}:{os.environ.get('DB_PASSWORD')}@localhost/televito"
+DB_URL = os.environ.get("DB_URL")
 TG_GROUP_NAME = os.environ.get("TG_GROUP_NAME")
 TG_API_HASH = os.environ.get("TG_API_HASH")
 TG_API_ID = os.environ.get("TG_API_ID")

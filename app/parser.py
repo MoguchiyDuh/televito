@@ -1,5 +1,5 @@
 import asyncio
-from datetime import date, datetime, timedelta
+from datetime import datetime, timedelta
 from pyrogram import Client
 from pyrogram.types.messages_and_media.message import Message
 from sqlalchemy import func, select, delete
@@ -93,10 +93,10 @@ class Parser:
         )
         cutoffdata = datetime.now() - timedelta(days=DAYS_TO_PARSE)
 
-        outdated_items_query = select(TGPostModel).filter(
+        result = select(TGPostModel).filter(
             TGPostModel.publication_datetime < cutoffdata
         )
-        outdated_items = await self.db.execute(outdated_items_query)
+        outdated_items = await self.db.execute(result)
         items_to_delete = outdated_items.scalars().all()
 
         for item in items_to_delete:

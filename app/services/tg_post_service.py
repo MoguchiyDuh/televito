@@ -1,6 +1,3 @@
-import re
-from fastapi import Request
-from fastapi.responses import RedirectResponse
 from sqlalchemy import desc, asc, func, select, between
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date
@@ -25,14 +22,14 @@ async def get_filtered_tg_posts(
 ) -> tuple[int, list[TGPostModel]]:
     query = select(TGPostModel)
 
-    # status filter
+    # Status filter
     if status == "today":
         status = date.today()
     elif status is not None:
         status = date.fromisoformat(status)
     if status is not None:
         query = query.where(TGPostModel.status <= status)
-    # price filter
+    # Price filter
     if price is not None and "-" in price:
         price_bottom, price_top = price.split("-")
         query = query.where(
@@ -40,7 +37,7 @@ async def get_filtered_tg_posts(
         )
     elif price is not None:
         query = query.where(TGPostModel.price <= int(price))
-    # duration filter
+    # Duration filter
     if duration is not None and "-" in duration:
         duration_bottom, duration_top = duration.split("-")
         query = query.where(
@@ -48,7 +45,7 @@ async def get_filtered_tg_posts(
         )
     elif duration is not None:
         query = query.where(TGPostModel.duration <= int(duration))
-    # rooms filter
+    # Rooms filter
     if rooms is not None and "-" in rooms:
         rooms_bottom, rooms_top = rooms.split("-")
         query = query.where(
@@ -56,13 +53,13 @@ async def get_filtered_tg_posts(
         )
     elif rooms is not None:
         query = query.between(TGPostModel.rooms, float(rooms), float(rooms) + 0.5)
-    # area filter
+    # Area filter
     if area is not None and "-" in area:
         area_bottom, area_top = area.split("-")
         query = query.where(between(TGPostModel.area, int(area_bottom), int(area_top)))
     elif area is not None:
         query = query.where(between(TGPostModel.area, int(area) - 10, int(area) + 10))
-    # floor filter
+    # Floor filter
     if floor is not None and "-" in floor:
         floor_bottom, floor_top = floor.split("-")
         query = query.where(
@@ -70,29 +67,29 @@ async def get_filtered_tg_posts(
         )
     elif floor is not None:
         query = query.where(TGPostModel.floor == int(floor))
-    # is_new filter
+    # Is_new filter
     if is_new is not None:
         query = query.where(TGPostModel.is_new == is_new)
-    # pets_allowed filter
+    # Pets_allowed filter
     if pets_allowed is not None:
         query = query.where(TGPostModel.pets_allowed == pets_allowed)
-    # sort_order filter
+    # Sort_order filter
     if sort_order is None:
         sort_order = False
-    # sort_by filter
+    # Sort_by filter
     if sort_by is not None:
         sort_by = getattr(TGPostModel, sort_by, None)
     if sort_by is None:
         sort_by = getattr(TGPostModel, "publication_datetime", None)
 
+    # Get total count of posts
     query = query.order_by(asc(sort_by) if sort_order else desc(sort_by))
+    result = await db.execute(select(func.count()).select_from(query.subquery()))
+    total = result.scalar()
 
-    # get total count of posts
-    count_query = await db.execute(select(func.count()).select_from(query.subquery()))
-    total = count_query.scalar()
-    # get items
+    # Get items
     query = query.offset((page_num - 1) * limit).limit(limit)
-    posts_query = await db.execute(query)
-    posts = posts_query.scalars().all()
+    result = await db.execute(query)
+    posts = result.scalars().all()
 
     return (total, posts)
