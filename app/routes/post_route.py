@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.security import oauth2_scheme, verify_access_token
-from ..db.connection import get_db
-from ..schemas import PostResponse, PostCreate, PostUpdate
-from ..services.post_service import (
+from core.security import oauth2_scheme, verify_access_token
+from db.connection import get_db
+from schemas import PostResponse, PostCreate, PostUpdate
+from services.post_service import (
     get_posts_list,
     get_post,
     create_post_logic,

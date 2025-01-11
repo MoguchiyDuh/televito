@@ -3,10 +3,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
-from ..db.connection import get_db
-from ..db.models import TGPostModel
-from ..schemas import TGPostSchema, ShortTGPostSchema
-from ..services.tg_post_service import get_filtered_tg_posts
+from db.connection import get_db
+from db.models import TGPostModel
+from schemas import TGPostSchema, ShortTGPostSchema
+from services.tg_post_service import get_filtered_tg_posts
 
 router = APIRouter()
 

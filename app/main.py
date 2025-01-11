@@ -3,9 +3,9 @@ from fastapi import FastAPI
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from contextlib import asynccontextmanager
 
-from .parser import Parser
-from .db.connection import get_db
-from .routes import *
+from parser import Parser
+from db.connection import get_db
+from routes import *
 
 # Initialize the scheduler for periodic tasks
 scheduler = AsyncIOScheduler()
@@ -13,7 +13,6 @@ scheduler = AsyncIOScheduler()
 
 async def update_db_task():
     """Task that updates the database by parsing new posts."""
-    print(f"{Fore.YELLOW}🔄 Updating DB...{Fore.RESET}")
     async for db in get_db():
         async with db as session:
             parser = Parser(session)
@@ -33,7 +32,6 @@ async def lifespan(app: FastAPI):
         yield  # Yield control to run the app
     finally:
         scheduler.shutdown()
-        print(f"{Fore.RED}Scheduler shut down gracefully.{Fore.RESET}")
 
 
 app = FastAPI(lifespan=lifespan)

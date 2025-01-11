@@ -5,14 +5,14 @@ from fastapi import HTTPException, status
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.security import (
+from core.security import (
     create_access_token,
     hash_password,
     verify_password,
 )
-from ..db.models import UserModel
-from ..schemas import UserChangePassword, UserCreate, UserUpdate
-from ..core.utils import save_image
+from db.models import UserModel
+from schemas import UserChangePassword, UserCreate, UserUpdate
+from core.utils import save_image
 
 
 async def get_user(

@@ -4,11 +4,10 @@ from pyrogram import Client
 from pyrogram.types.messages_and_media.message import Message
 from sqlalchemy import func, select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
-from colorama import Fore
-
-from .db.models import TGPostModel
-from .core.config import TG_API_HASH, TG_API_ID, TG_GROUP_NAME
-from .parser_re import parse_text
+from core.logger import televito_logger
+from db.models import TGPostModel
+from core.config import TG_API_HASH, TG_API_ID, TG_GROUP_NAME
+from parser_re import parse_text
 
 app = Client("televito", api_hash=TG_API_HASH, api_id=TG_API_ID)
 DAYS_TO_PARSE = 6 * 90  # 6 months
@@ -20,15 +19,15 @@ class Parser:
 
     @staticmethod
     def text_to_model(
-        parsed_text: str,
+        listing_data: dict,
         google_maps_url: str,
         images: list[str],
         post_datetime: datetime,
     ) -> TGPostModel:
         """Converts parsed text and metadata into a ParseModel object."""
         return TGPostModel(
+            **listing_data,
             google_maps_url=google_maps_url,
-            **parsed_text,
             images=images,
             publication_datetime=post_datetime,
         )
@@ -49,36 +48,33 @@ class Parser:
         # if there is no similar post in the DB, add it to the DB
         if not similar_post:
             self.db.add(item)
-            print(
-                f"{Fore.GREEN}✓ NEW POST ADDED TO THE DB.{Fore.RESET}\n"
-                f"{Fore.CYAN}Location:{Fore.RESET} {item.location}, {Fore.CYAN}Area:{Fore.RESET} {item.area}, {Fore.CYAN}Published on:{Fore.RESET} {item.publication_datetime}"
+            televito_logger.info(
+                f"NEW POST ADDED TO THE DB. {item.location}, {item.area}, {item.publication_datetime}"
             )
             await self.db.commit()
 
         # if the post in the DB is outdated, update it
         elif item.publication_datetime > similar_post.publication_datetime:
-            print(f"{Fore.BLUE}🔄 UPDATING EXISTING POST IN THE DB.{Fore.RESET}")
+            changes = []
             for key, value in item.__dict__.items():
                 if key != "_sa_instance_state" and value != getattr(similar_post, key):
-                    print(
-                        f"{Fore.CYAN}{key.upper()}: {Fore.YELLOW}Updated from{Fore.RESET} {getattr(similar_post, key)} {Fore.YELLOW}to{Fore.RESET} {value}"
-                    )
+                    changes.append(f"{key}: {getattr(similar_post, key)} -> {value}")
                     setattr(similar_post, key, value)
+            televito_logger.info(
+                f"UPDATING EXISTING POST IN THE DB. {item.location}, {item.area}, {item.publication_datetime}:"
+                + "\n"
+                + "\n".join(changes)
+            )
             await self.db.commit()
 
         # if the post in the DB is newer than the parsing post, skip it
         else:
-            print(
-                f"{Fore.YELLOW}⚠️ SKIPPED OUTDATED POST.{Fore.RESET}\n"
-                f"{Fore.CYAN}Location:{Fore.RESET} {item.location}, {Fore.CYAN}Area:{Fore.RESET} {item.area}, {Fore.CYAN}Published on:{Fore.RESET} {item.publication_datetime}"
+            televito_logger.info(
+                f"SKIPPED OUTDATED POST. {item.location}, {item.area}, {item.publication_datetime}"
             )
 
     async def delete_item(self, item: TGPostModel):
         """Deletes an item from the database."""
-        print(
-            f"{Fore.RED}🗑️ OUTDATED POST DELETED FROM THE DB{Fore.RESET}\n",
-            f"{Fore.CYAN}Location:{Fore.RESET} {item.location}, {Fore.CYAN}Area:{Fore.RESET} {item.area}, {Fore.CYAN}Published on:{Fore.RESET} {item.publication_datetime}",
-        )
         query = delete(TGPostModel).where(TGPostModel == item)
         await self.db.execute(query)
         await self.db.commit()
@@ -108,8 +104,8 @@ class Parser:
             async for post in app.get_chat_history(TG_GROUP_NAME):
                 post: Message
                 if post.date <= latest_date:
-                    print(
-                        f"{Fore.GREEN}🔄💾 THE DATABASE IS UP-TO-DATE AS OF{Fore.RESET} {datetime.now()}"
+                    televito_logger.info(
+                        f"THE DATABASE IS UP-TO-DATE AS OF {datetime.now()}"
                     )
                     break
 

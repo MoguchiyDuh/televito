@@ -4,14 +4,6 @@ from uuid import uuid4
 from fastapi import HTTPException, UploadFile, status
 
 
-def store_log(text: str, title: str = None):
-    with open("log.txt", "a+", encoding="utf-8") as file:
-        if title is not None:
-            file.write(title.center(30, "-") + "\n")
-
-        file.write(text + "\n\n")
-
-
 def save_image(image: UploadFile, dir: str) -> str:
     file_extension = image.filename.split(".")[-1]
     if file_extension not in ["jpg", "jpeg", "png"]:

@@ -3,11 +3,11 @@ from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.utils import save_image
-from ..db.models import PostModel, CategoryModel
-from ..schemas import PostCreate, PostUpdate
-from ..services.user_service import get_user
-from ..routes.category_route import get_parent_categories, get_subcategories
+from core.utils import save_image
+from db.models import PostModel, CategoryModel
+from schemas import PostCreate, PostUpdate
+from services.user_service import get_user
+from routes.category_route import get_parent_categories, get_subcategories
 
 IMAGES_DIR = "./app/content/post_images"
 MAX_IMAGE_SIZE = 5 * 1024 * 1024  # 5mb in bytes

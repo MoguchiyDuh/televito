@@ -1,25 +1,22 @@
-from typing import Optional
-
 from fastapi import (
     APIRouter,
     Depends,
-    File,
     Request,
     Response,
 )
 from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..core.security import oauth2_scheme, verify_access_token
-from ..db.connection import get_db
-from ..schemas.user_schema import (
+from core.security import oauth2_scheme, verify_access_token
+from db.connection import get_db
+from schemas.user_schema import (
     UserChangePassword,
     UserCreate,
     UserDelete,
     UserProfileResponse,
     UserUpdate,
 )
-from ..services.user_service import (
+from services.user_service import (
     authenticate_user,
     change_user_password_logic,
     create_user_logic,

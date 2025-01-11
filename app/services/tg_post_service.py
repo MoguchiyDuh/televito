@@ -2,7 +2,7 @@ from sqlalchemy import desc, asc, func, select, between
 from sqlalchemy.ext.asyncio import AsyncSession
 from datetime import date
 
-from ..db.models import TGPostModel
+from db.models import TGPostModel
 
 
 async def get_filtered_tg_posts(

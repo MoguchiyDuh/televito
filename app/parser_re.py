@@ -1,14 +1,11 @@
 from datetime import date
 import re
-import traceback
-from colorama import Fore
-
-from .parse_ai import parse_with_ai
-from .core.utils import store_log
+from core.logger import televito_logger
 
 
-def parse_russian_date(date_str: str, post_date: date) -> date:
+def parse_date(date_str: str, post_date: date) -> date:
     """Converts Russian date text to a datetime object."""
+    date_str = date_str.replace("г", "").replace(".", " ").strip()
     months_map = {
         "янв": 1,
         "фев": 2,
@@ -23,13 +20,19 @@ def parse_russian_date(date_str: str, post_date: date) -> date:
         "ноя": 11,
         "дек": 12,
     }
-    date_parts = date_str.replace(".", "").split()
+    date_parts = date_str.split()
     day = int(date_parts[0])
-    month = (
-        months_map.get(date_parts[1][:3].lower())
-        if len(date_parts) > 1
-        else post_date.month if post_date.day <= day else post_date.month + 1
-    )
+
+    try:
+        month = int(date_parts[1])
+    except ValueError:
+        month = months_map.get(date_parts[1][:3].lower())
+    except IndexError:
+        if post_date.day <= day:
+            month = post_date.month
+        else:
+            month = post_date.month + 1
+
     year = (
         int(date_parts[2])
         if len(date_parts) > 2
@@ -38,138 +41,112 @@ def parse_russian_date(date_str: str, post_date: date) -> date:
     return date(year=year, month=month, day=day)
 
 
-def parse_text(text: str, post_date: date) -> dict:
+def parse_text(text: str, post_date: date) -> dict | None:
     """Parses rental listing text to structured data."""
-    store_log(
-        "POST DATE: " + post_date.strftime("%Y-%m-%d") + "\n" + text, "TEXT TO PARSE"
-    )
     lines = text.strip().split("\n")
+    result = {
+        "location": None,
+        "status": None,
+        "price": None,
+        "duration": None,
+        "is_new": False,
+        "rooms": None,
+        "room_description": None,
+        "area": None,
+        "floor": None,
+        "floors_in_building": None,
+        "pets_allowed": False,
+        "parking": None,
+    }
     try:
-        # Location
-        location = (
-            re.search(r"Локация -(.+)", lines[0]).group(1).replace(" ,", ",").strip()
-        )
-        if "Локация" in lines[0]:
-            lines.pop(0)
+        for line in lines:
+            line = line.lower().strip()
 
-        # Status
-        lines[0] = lines[0].lower().strip()
-        if "свободна сейчас" in lines[0]:
-            status = post_date
-        elif "свободна" in lines[0]:
-            status_match = re.search(r"(\d{1,2}.*[^ г\.])", lines[0])
-            status = parse_russian_date(
-                status_match.group(1),
-                post_date,
-            )
-        else:
-            None
+            if "локация" in line:
+                result["location"] = (
+                    re.search(r"локация -(.+)", line)
+                    .group(1)
+                    .replace(" ,", ",")
+                    .strip()
+                )
+                televito_logger.debug(result["location"])
 
-        if "актуальность" in lines[0]:
-            lines.pop(0)
+            elif "актуальность" in line:
+                if "свободна сейчас" in line:
+                    result["status"] = post_date
+                elif "свободна" in line:
+                    status_match = re.search(r"\d{1,2}.*", line)
+                    result["status"] = parse_date(
+                        status_match.group(0),
+                        post_date,
+                    )
+                televito_logger.debug(result["status"])
 
-        # Is Building New?
-        for index, line in enumerate(lines):
-            if "Новый дом" in line:
-                is_new = True
-                lines.pop(index)
-                break
-            else:
-                is_new = False
+            elif "новый дом" in line:
+                result["is_new"] = True
+                televito_logger.debug(result["is_new"])
 
-        # Price
-        price = float(re.search(r"(\d+(\.\d+)?)", lines[0]).group(1).replace(",", "."))
-        if "💸" in lines[0]:
-            lines.pop(0)
+            elif "💸" in line:
+                result["price"] = float(
+                    re.search(r"(\d+(\.\d+)?)", line).group(1).replace(",", ".")
+                )
+                televito_logger.debug(result["price"])
 
-        # Lease Duration
-        if "Срок аренды" in lines[0]:
-            duration_match = re.search(r"от (\d+)", lines[0])
-            duration = int(duration_match.group(1))
-        else:
-            duration = None
+            elif "срок аренды" in line:
+                duration_match = re.search(r"от (\d+)", line)
+                result["duration"] = int(duration_match.group(1))
+                televito_logger.debug(result["duration"])
 
-        if "Срок аренды" in lines[0]:
-            lines.pop(0)
+            elif "комнат" in line or "студия" in line:
+                if "студия" in line:
+                    result["rooms"] = 1.0
+                else:
+                    line = line.replace(",", ".").replace("+", "")
+                    result["rooms"] = float(
+                        re.search(r"(\d+(\.\d+)?)\s+комнат", line)
+                        .group(1)
+                        .replace(",", ".")
+                    )
+                televito_logger.debug(result["rooms"])
 
-        # Rooms Count
-        rooms_match = re.search(r"(\d+([\.,]\d+)?) комнат", lines[0])
-        if "Студия" in lines[0]:
-            rooms = 1.0
-        elif rooms_match:
-            rooms = float(rooms_match.group(1).replace(",", "."))
-        else:
-            rooms = None
+                room_description_match = re.search(r"\((.+)\)", line)
+                if room_description_match:
+                    result["room_description"] = room_description_match.group(1)
+                    televito_logger.debug(result["room_description"])
 
-        # Room description
-        room_description_match = re.search(r"\((.+)\)", lines[0])
-        room_description = (
-            room_description_match.group(1) if room_description_match else None
-        )
-        lines.pop(0)
+            elif "площадь" in line:
+                result["area"] = float(re.search(r"площадь (\d+)", line).group(1))
+                televito_logger.debug(result["area"])
 
-        # Area
-        area = float(re.search(r"Площадь (\d+) m", lines[0]).group(1))
-        lines.pop(0)
+            elif "этаж" in line:
+                if "высокий цокольный этаж" in line:
+                    result["floor"] = 0
+                elif "подвал" in line:
+                    result["floor"] = -1
+                else:
+                    result["floor"] = int(re.search(r"(\d+)/", line).group(1))
+                televito_logger.debug(result["floor"])
 
-        # Floor Info
-        floor_match = re.search(r"(\d+)/", lines[0])
+                floors_in_building_match = re.search(r"/(\d+)", line)
+                if floors_in_building_match:
+                    result["floors_in_building"] = int(
+                        floors_in_building_match.group(1)
+                    )
+                    televito_logger.debug(result["floors_in_building"])
 
-        if "Высокий цокольный этаж" in lines[0]:
-            floor = 0
-        elif floor_match:
-            floor = int(floor_match.group(1))
-        else:
-            floor = None
+            elif "с животными" in line:
+                result["pets_allowed"] = "можно" in line
+                televito_logger.debug(result["pets_allowed"])
 
-        # Total floors in building
-        floors_in_building_match = re.search(r"/(\d+)", lines[0])
-        if floors_in_building_match:
-            floors_in_building = int(floors_in_building_match.group(1))
-        else:
-            floors_in_building = None
+            elif "парковка" in line:
+                result["parking"] = (
+                    line.replace("🚗", "").replace("парковка -", "").strip()
+                )
+                televito_logger.debug(result["parking"])
 
-        if "этаж" in lines[0]:
-            lines.pop(0)
+        televito_logger.info(f"Listing {post_date} parsed successfully")
+        return result
 
-        # Are pets allowed?
-        pets_allowed = bool(re.search(r"С животными – можно", lines[0]))
-        lines.pop(0)
-
-        if "📞" in lines[0]:
-            lines.pop(0)
-
-        # Parking Info
-        if lines and "#" not in lines[0]:
-            parking = lines[0].replace("🚗", "").replace("Парковка -", "").strip()
-        else:
-            parking = None
-
-        result = {
-            "location": location,
-            "status": status,
-            "price": price,
-            "duration": duration,
-            "is_new": is_new,
-            "rooms": rooms,
-            "room_description": room_description,
-            "area": area,
-            "floor": floor,
-            "floors_in_building": floors_in_building,
-            "pets_allowed": pets_allowed,
-            "parking": parking,
-        }
     except Exception as e:
-        store_log(traceback.format_exc(), "ERROR WHILE PARSING TEXT")
-        print(
-            f"{Fore.YELLOW}⚠️ Couldn't parse text using regex. Trying AI model...{Fore.RESET}"
-        )
-        # try to parse the post using ai model
-        result = parse_with_ai(text, post_date, temperature=0.2)
-
-    if result:
-        store_log("\n".join([f"{k}: {v}" for k, v in result.items()]), "RESULT")
-    else:
-        print(f"{Fore.RED}❌ Parsing failed with both regex and AI.{Fore.RESET}")
-
-    return result
+        televito_logger.error(f"Error parsing post {post_date}: {e}\n{text}")
+        return None
